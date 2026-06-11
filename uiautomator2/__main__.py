@@ -21,6 +21,13 @@ from uiautomator2.version import __version__
 logger = logging.getLogger(__name__)
 
 
+def _valid_port(value: str) -> int:
+    try:
+        return int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"port must be an integer, got {value!r}")
+
+
 def cmd_init(args):
     serial = args.serial or args.serial_optional
     if serial:
@@ -155,6 +162,7 @@ _commands = [
         action=cmd_init,
         command="init",
         help="install enssential resources to device",
+        port=True,
         flags=[
             dict(
                 args=["--addr"],
@@ -178,6 +186,7 @@ _commands = [
         action=cmd_screenshot,
         command="screenshot",
         help="take device screenshot",
+        port=True,
         flags=[
             dict(
                 args=["filename"],
@@ -192,6 +201,7 @@ _commands = [
         action=cmd_install,
         command="install",
         help="install packages",
+        port=True,
         flags=[
             dict(args=["url"], help="package url"),
         ],
@@ -200,6 +210,7 @@ _commands = [
         action=cmd_uninstall,
         command="uninstall",
         help="uninstall packages",
+        port=True,
         flags=[
             dict(args=["--all"], action="store_true", help="uninstall all packages"),
             dict(args=["package_name"], nargs="*", help="package name"),
@@ -209,21 +220,23 @@ _commands = [
         action=cmd_start,
         command="start",
         help="start application",
+        port=True,
         flags=[dict(args=["package_name"], type=str, nargs=None, help="package name")],
     ),
     dict(
         action=cmd_stop,
         command="stop",
         help="stop application",
+        port=True,
         flags=[
             dict(args=["--all"], action="store_true", help="stop all"),
             dict(args=["package_name"], nargs="*", help="package name"),
         ],
     ),
-    dict(action=cmd_current, command="current", help="show current application"),
-    dict(action=cmd_doctor, command="doctor", help="detect connect problem"),
+    dict(action=cmd_current, command="current", help="show current application", port=True),
+    dict(action=cmd_doctor, command="doctor", help="detect connect problem", port=True),
     dict(
-        action=cmd_console, command="console", help="launch interactive python console"
+        action=cmd_console, command="console", help="launch interactive python console", port=True,
     ),
     dict(
         action=cmd_purge,
@@ -237,8 +250,8 @@ def main():
     # yapf: disable
     # -p must come after the subcommand: `uia2 screenshot -p 9090`
     shared = argparse.ArgumentParser(add_help=False)
-    shared.add_argument('-p', '--port', type=int, default=DEFAULT_SERVER_PORT,
-                        help='uiautomator2 server port on device')
+    shared.add_argument('-p', '--port', type=_valid_port, default=DEFAULT_SERVER_PORT,
+                        help='uiautomator2 server port on device (1-65535)')
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -253,8 +266,9 @@ def main():
     for c in _commands:
         cmd_name = c['command']
         actions[cmd_name] = c['action']
+        parents = [shared] if c.get('port') else []
         sp = subparser.add_parser(cmd_name, help=c.get('help'),
-                                  parents=[shared],
+                                  parents=parents,
                                   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         for f in c.get('flags', []):
             args = f.get('args')

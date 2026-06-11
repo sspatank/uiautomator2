@@ -205,8 +205,11 @@ class BasicUiautomatorServer(AbstractUiautomatorServer):
     this is runs without atx-agent
     """
     _lock = threading.Lock() # thread safe lock
-    
+    _device_server_port: int = DEFAULT_SERVER_PORT
+
     def __init__(self, dev: adbutils.AdbDevice, device_server_port: int = DEFAULT_SERVER_PORT) -> None:
+        if not 1 <= device_server_port <= 65535:
+            raise ValueError(f"port must be 1-65535, got {device_server_port}")
         self._dev = dev
         self._process = None
         self._debug = False
