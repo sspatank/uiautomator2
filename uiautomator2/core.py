@@ -21,7 +21,6 @@ import requests
 
 from uiautomator2.abstract import AbstractUiautomatorServer
 
-DEFAULT_SERVER_PORT = 9008
 from uiautomator2.exceptions import AccessibilityServiceAlreadyRegisteredError, APKSignatureError, HTTPError, \
     HTTPTimeoutError, LaunchUiAutomationError, RPCInvalidError, RPCStackOverflowError, RPCUnknownError, \
     UiAutomationNotConnectedError, UiObjectNotFoundError
@@ -29,6 +28,8 @@ from uiautomator2.utils import with_package_resource
 from uiautomator2.version import __apk_version__
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SERVER_PORT = 9008
 
 class MockAdbProcess:
     def __init__(self, conn: adbutils.AdbConnection) -> None:
