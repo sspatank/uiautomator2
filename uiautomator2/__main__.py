@@ -251,7 +251,7 @@ _commands = [
 
 def main():
     # yapf: disable
-    # -p must come after the subcommand: `uia2 screenshot -p 9090`
+    # -p must come after the subcommand: `uiautomator2 screenshot -p 9090`
     shared = argparse.ArgumentParser(add_help=False)
     shared.add_argument('-p', '--port', type=_valid_port, default=DEFAULT_SERVER_PORT,
                         help='uiautomator2 server port on device (1-65535)')
