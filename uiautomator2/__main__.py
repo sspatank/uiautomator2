@@ -23,9 +23,12 @@ logger = logging.getLogger(__name__)
 
 def _valid_port(value: str) -> int:
     try:
-        return int(value)
+        port = int(value)
     except ValueError:
         raise argparse.ArgumentTypeError(f"port must be an integer, got {value!r}")
+    if not 1 <= port <= 65535:
+        raise argparse.ArgumentTypeError(f"port must be in 1-65535, got {port}")
+    return port
 
 
 def cmd_init(args):
