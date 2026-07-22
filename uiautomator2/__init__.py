@@ -873,6 +873,11 @@ class _PluginMixIn:
         return _sr.Screenrecord(self)
 
     @cached_property
+    def dhu(self):
+        from uiautomator2 import dhu as _dhu
+        return _dhu.DHU(self)
+
+    @cached_property
     def swipe_ext(self) -> SwipeExt:
         return SwipeExt(self)
 
