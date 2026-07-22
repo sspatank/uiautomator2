@@ -17,6 +17,10 @@ Pillow = "*"
 retry2 = "^0.9.5"
 click = "*"
 importlib-resources = {version = "*", markers = "python_version < \"3.9\""}
+psutil = {version = "*", optional = true}
+
+[tool.poetry.extras]
+dhu = ["psutil"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.1.1"
