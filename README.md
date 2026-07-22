@@ -1192,6 +1192,31 @@ Session represents an app lifecycle. Can be used to start app, detect app crash.
         print("Session is not active (app might have crashed or closed)")
     ```
 
+### Desktop Head Unit (DHU)
+
+Automate Google's Android Auto [Desktop Head Unit](https://developer.android.com/training/cars/testing/dhu) emulator. Unlike the rest of uiautomator2, DHU renders car-UI in its own window on the host desktop (not the phone screen), so screenshots/taps go through DHU's own interactive stdin console rather than adb or the on-device uiautomator server.
+
+```python
+with d.dhu:  # starts the desktop-head-unit process, stops it on exit
+    d.dhu.tap(100, 200)  # tap DHU window-local coordinates
+    im = d.dhu.screenshot()  # PIL.Image by default, or format="opencv"
+
+    # wait for a template image to appear on the DHU screen, then tap its center
+    d.dhu.click("icon.png", timeout=10)
+```
+
+Or manage the lifecycle manually:
+
+```python
+d.dhu.start()  # resolves the desktop-head-unit binary, launches it, sets up adb forward
+d.dhu.is_running()  # True
+d.dhu.stop()
+```
+
+The `desktop-head-unit` binary is resolved in this order: explicit `DHU(d, binary_path=...)` argument, `d.settings['dhu_binary_path']`, the `DHU_BINARY_PATH` environment variable, `$ANDROID_SDK_ROOT`/`$ANDROID_HOME` (`extras/google/auto/desktop-head-unit`), then `$PATH`. If it can't be found, `DHUBinaryNotFoundError` is raised.
+
+Install the optional `psutil` dependency (`pip install uiautomator2[dhu]`) for best-effort cleanup of stale DHU processes before each `start()`.
+
 
 ## Other APIs
 
