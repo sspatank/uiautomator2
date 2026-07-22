@@ -189,14 +189,16 @@ def draw_point(im: Image.Image, x: int, y: int) -> Image.Image:
     return im
 
 
-def imread(data) -> np.ndarray:
+def imread(data, flag=cv2.IMREAD_COLOR) -> np.ndarray:
     """
     Args:
         data: local path or http url or data:image/base64,xxx
-    
+        flag: cv2.imread flag, e.g. cv2.IMREAD_UNCHANGED to keep an alpha channel.
+            Ignored when data is already a np.ndarray or PIL.Image.
+
     Returns:
         opencv image
-    
+
     Raises:
         IOError
     """
@@ -205,16 +207,101 @@ def imread(data) -> np.ndarray:
     elif isinstance(data, Image.Image):
         return pil2cv(data)
     elif data.startswith('data:image/'):
-        return _open_data_url(data)
+        return _open_data_url(data, flag)
     elif re.match(r'^https?://', data):
-        return _open_image_url(data)
+        return _open_image_url(data, flag)
     elif os.path.isfile(data):
-        im = cv2.imread(data)
+        im = cv2.imread(data, flag)
         if im is None:
             raise IOError("Image format error: %s" % data)
         return im
 
     raise IOError("image read invalid data: %s" % data)
+
+
+def match_multiscale(imdata: Union[np.ndarray, str, Image.Image],
+                      target: np.ndarray,
+                      threshold: float = 0.8,
+                      scale_range: typing.Tuple[float, float] = (0.1, 4.0),
+                      scale_step: float = 0.1) -> typing.Optional[dict]:
+    """
+    Multi-scale template match, built on top of `findit`'s template engine.
+    Unlike `ImageX.match` (which configures a narrow near-1.0 scale range,
+    assuming template and target were captured at the same resolution), this
+    sweeps a wide scale range by default -- useful when the template was
+    captured at a different resolution/DPI than the live target (e.g. DHU
+    window screenshots, whose size can vary by host/config).
+
+    Args:
+        imdata: file, url, pillow or opencv image object (the template to search for).
+            RGBA templates are alpha-composited onto a mid-gray background before
+            matching, since transparent icon templates otherwise match poorly.
+            (`findit`'s `engine_template_mask_pic_object` mask isn't used here: its
+            multi-scale loop resizes the mask cumulatively from the *previous*
+            iteration's already-resized mask instead of from the original each time,
+            so mask and template sizes diverge and `matchTemplate` raises past the
+            first scale step.)
+        target: opencv (BGR) image to search within, e.g. a screenshot
+        threshold: minimum similarity [0-1] to consider a match
+        scale_range: (min_scale, max_scale) multiplier range applied to the template
+        scale_step: increment between scales tried
+
+    Returns:
+        {"similarity": float, "point": [x, y]} (point is the matched region's center),
+        or None if no scale reached `threshold`.
+    """
+    if isinstance(imdata, np.ndarray):
+        template = imdata
+    elif isinstance(imdata, Image.Image):
+        # imread()/pil2cv() force-convert PIL images to RGB, dropping alpha --
+        # go through cv2 directly here so an RGBA PIL template still reaches
+        # the alpha-compositing step below.
+        template = cv2.cvtColor(np.array(imdata.convert("RGBA")), cv2.COLOR_RGBA2BGRA) \
+            if imdata.mode in ("RGBA", "LA", "PA") else pil2cv(imdata)
+    else:
+        template = imread(imdata, cv2.IMREAD_UNCHANGED)
+
+    if template.ndim == 3 and template.shape[2] == 4:
+        bgr, alpha = template[:, :, :3], template[:, :, 3]
+        alpha_f = (alpha.astype(np.float32) / 255.0)[:, :, None]
+        bg = np.full_like(bgr, 127, dtype=np.float32)
+        template = (bgr.astype(np.float32) * alpha_f + bg * (1 - alpha_f)).astype(np.uint8)
+
+    th, tw = template.shape[:2]
+    min_scale, max_scale = scale_range
+    # keep resized templates at >=5px per side, same floor the old loop-based
+    # implementation enforced (`min(sw, sh) >= 5`) -- degenerate near-zero-size
+    # templates trivially "match" anything, producing false positives.
+    min_scale = max(min_scale, 5.0 / min(tw, th))
+    if min_scale > max_scale:
+        raise ValueError(
+            f"template is too small for scale_range={scale_range!r}: "
+            f"the smallest usable scale ({min_scale:.3f}) exceeds max_scale ({max_scale}); "
+            f"pass a wider scale_range"
+        )
+    num_steps = max(2, round((max_scale - min_scale) / scale_step) + 1)
+
+    fi = findit.FindIt(engine=['template'],
+                        engine_template_cv_method_name="cv2.TM_CCOEFF_NORMED",
+                        engine_template_scale=(min_scale, max_scale, num_steps),
+                        pro_mode=True)
+    fi.load_template("template", pic_object=template)
+
+    try:
+        raw_result = fi.find("target", target_pic_object=target)
+    except IndexError:
+        # template (at every scale tried) is larger than target
+        return None
+
+    result = raw_result['data']['template']['TemplateEngine']
+    similarity = result['target_sim']
+    if similarity < threshold:
+        return None
+
+    # findit's target_point is already the matched region's center
+    # (see toolbox.fix_location), unlike cv2.minMaxLoc's top-left corner.
+    mx, my = result['target_point']
+    return {"similarity": float(similarity), "point": [int(mx), int(my)]}
 
 
 class ImageX(object):
