@@ -19,6 +19,7 @@ class Settings(object):
             "operation_delay_methods": ["click", "swipe"],
             "fallback_to_blank_screenshot": False,
             "max_depth": 50,
+            "dhu_binary_path": None,
         }
 
         self._deprecated_props = {
@@ -33,6 +34,7 @@ class Settings(object):
             "post_delay": (float, int),
             "xpath_debug": bool,
             "fallback_to_blank_screenshot": bool,
+            "dhu_binary_path": (str, type(None)),
         }
         for k, v in self._defaults.items():
             if k not in self._prop_types:
